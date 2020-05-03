@@ -236,10 +236,10 @@ public class GXMain extends Fragment implements IGXMediaListener, IGXTaskCallbac
                     Toast.makeText(getActivity(), R.string.invalidManufacturer, Toast.LENGTH_SHORT).show();
                     mOpen.setEnabled(false);
                 }
-                if (mDevice.getMedia() instanceof GXSerial && ((GXSerial) mDevice.getMedia()).getPort() == null) {
+                /*if (mDevice.getMedia() instanceof GXBlutooth && ((GXBlutooth) mDevice.getMedia()).getPort() == null) {
                     Toast.makeText(getActivity(), R.string.invalidSerialPort, Toast.LENGTH_SHORT).show();
                     mOpen.setEnabled(false);
-                }
+                }*/
             }
 
             mSearch.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
@@ -605,8 +605,8 @@ public class GXMain extends Fragment implements IGXMediaListener, IGXTaskCallbac
     private void initializeConnection() throws Exception, InterruptedException {
         IGXMedia media = mDevice.getMedia();
         media.open();
-        if (media instanceof GXSerial) {
-            GXSerial serial = (GXSerial) media;
+        if (media instanceof GXBlutooth) {
+            GXBlutooth serial = (GXBlutooth) media;
             if (mDevice.getStartProtocol() == StartProtocolType.IEC) {
                 ReceiveParameters<byte[]> p =
                         new ReceiveParameters<byte[]>(byte[].class);

@@ -58,7 +58,7 @@ import gurux.dlms.enums.Security;
 import gurux.dlms.manufacturersettings.GXManufacturerCollection;
 import gurux.dlms.manufacturersettings.HDLCAddressType;
 import gurux.dlms.manufacturersettings.StartProtocolType;
-import gurux.serial.GXSerial;
+
 import gurux.serial.GXPort;
 
 public class MainActivity extends AppCompatActivity
@@ -72,7 +72,7 @@ public class MainActivity extends AppCompatActivity
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        mDevice.setMedia(new GXSerial(this));
+        mDevice.setMedia(new GXBlutooth(this));
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -92,11 +92,11 @@ public class MainActivity extends AppCompatActivity
         navigationView.setNavigationItemSelectedListener(this);
         loadSettings();
         Fragment fragment = null;
-        if (mDevice.getMedia() instanceof GXSerial){
-            GXSerial s = ((GXSerial)mDevice.getMedia());
+        if (mDevice.getMedia() instanceof GXBlutooth){
+            GXBlutooth s = ((GXBlutooth)mDevice.getMedia());
             GXPort port = s.getPort();
             if (!isPortAvailable(s.getPorts(), s.getPort())){
-                fragment = ((GXSerial) mDevice.getMedia()).properties();
+                fragment = ((GXBlutooth) mDevice.getMedia()).properties();
             }
         }
         if (fragment == null){
@@ -235,7 +235,7 @@ public class MainActivity extends AppCompatActivity
         } else if (id == R.id.nav_meterSettings) {
             fragment = GXSettings.newInstance(mDevice, mManufacturers);
         } else if (id == R.id.nav_mediaSettings) {
-            fragment = ((GXSerial) mDevice.getMedia()).properties();
+            fragment = ((GXBlutooth) mDevice.getMedia()).properties();
         } else if (id == R.id.nav_send) {
 
         } else if (id == R.id.nav_share) {

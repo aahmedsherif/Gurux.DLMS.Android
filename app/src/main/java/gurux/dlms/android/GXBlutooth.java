@@ -40,6 +40,7 @@ import gurux.common.IGXMedia2;
 import gurux.common.IGXMediaListener;
 import gurux.common.MediaStateEventArgs;
 import gurux.common.PropertyChangedEventArgs;
+import gurux.common.ReceiveEventArgs;
 import gurux.common.ReceiveParameters;
 import gurux.common.TraceEventArgs;
 import gurux.common.enums.MediaState;
@@ -54,7 +55,7 @@ import gurux.serial.GXPropertiesFragment;
 import gurux.serial.IGXSerialListener;
 import gurux.serial.enums.AvailableMediaSettings;
 
-public class GXBlutooth  implements IGXMedia2, AutoCloseable {
+public class GXBlutooth implements IGXMedia2, AutoCloseable {
 
     private int receiveDelay;
     private int asyncWaitTime;
@@ -82,8 +83,9 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
     private OutputStream mmOutStream;
     private BluetoothSocket mmSocket;
     private BluetoothDevice mmDevice;
+    private GXBlutoothReceiveThread mReceiver;
 
-    public GXBlutooth(Context context){
+    public GXBlutooth(Context context) {
 
         this.mBaudRate = BaudRate.BAUD_RATE_9600;
         this.mDataBits = 8;
@@ -131,7 +133,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         GXPort[] var7 = this.getPorts();
         int var8 = var7.length;
 
-        for(int var9 = 0; var9 < var8; ++var9) {
+        for (int var9 = 0; var9 < var8; ++var9) {
             GXPort it = var7[var9];
             if (port.compareToIgnoreCase(it.getPort()) == 0) {
                 this.setPort(it);
@@ -162,7 +164,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         GXPort[] var7 = this.getPorts();
         int var8 = var7.length;
 
-        for(int var9 = 0; var9 < var8; ++var9) {
+        for (int var9 = 0; var9 < var8; ++var9) {
             GXPort it = var7[var9];
             if (port.compareToIgnoreCase(it.getPort()) == 0) {
                 this.setPort(it);
@@ -183,7 +185,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
             this.mContext = context;
             mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             if (mBluetoothAdapter == null) {
-                Toast.makeText(this.mContext,"Bluetooth not supported",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this.mContext, "Bluetooth not supported", Toast.LENGTH_SHORT).show();
 
                 // throw new Exception("Bluetooth not supported");
             }
@@ -221,7 +223,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
     public void addListener(IGXMediaListener listener) {
         this.mMediaListeners.add(listener);
         if (listener instanceof IGXSerialListener) {
-            this.mPortListeners.add((IGXSerialListener)listener);
+            this.mPortListeners.add((IGXSerialListener) listener);
         }
 
     }
@@ -230,13 +232,13 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
     public void removeListener(IGXMediaListener listener) {
         this.mMediaListeners.remove(listener);
         if (listener instanceof IGXSerialListener) {
-            this.mPortListeners.remove((IGXSerialListener)listener);
+            this.mPortListeners.remove((IGXSerialListener) listener);
         }
     }
 
     @Override
     public void copy(Object target) {
-        GXBlutooth tmp = (GXBlutooth)target;
+        GXBlutooth tmp = (GXBlutooth) target;
         this.setPort(tmp.getPort());
         this.setBaudRate(tmp.getBaudRate());
         this.setStopBits(tmp.getStopBits());
@@ -269,7 +271,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         this.close();
 
 
-        synchronized(this.mSyncBase.getSync()) {
+        synchronized (this.mSyncBase.getSync()) {
             this.mSyncBase.resetLastPosition();
         }
 
@@ -277,7 +279,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         if (this.mTrace.ordinal() >= TraceLevel.INFO.ordinal()) {
             String eopString = "None";
             if (this.getEop() instanceof byte[]) {
-                eopString = GXCommon.bytesToHex((byte[])((byte[])this.getEop()));
+                eopString = GXCommon.bytesToHex((byte[]) ((byte[]) this.getEop()));
             } else if (this.getEop() != null) {
                 eopString = this.getEop().toString();
             }
@@ -289,11 +291,10 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
 
 
-
         if (pairedDevices.size() > 0) {
             // There are paired devices. Get the name and address of each paired device.
             for (BluetoothDevice device : pairedDevices) {
-                if(device.getName().contains("REDZ")){
+                if (device.getName().contains("REDZ")) {
 
                     //connect(device);
 
@@ -313,7 +314,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                     mmSocket = tmp;
 
 
-                    if(mBluetoothAdapter.isDiscovering()) {
+                    if (mBluetoothAdapter.isDiscovering()) {
                         mBluetoothAdapter.cancelDiscovery();
                     }
 
@@ -330,7 +331,6 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                         }
                         return;
                     }
-
 
 
                     InputStream tmpIn = null;
@@ -352,8 +352,20 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                     mmInStream = tmpIn;
                     mmOutStream = tmpOut;
 
+
                 }
             }
+        }
+
+
+        if (this.mmOutStream != null && mmInStream != null) {
+
+            this.mReceiver = new GXBlutoothReceiveThread(this, this.mmSocket, mmInStream);
+            this.mReceiver.start();
+            this.notifyMediaStateChange(MediaState.OPEN);
+
+        } else {
+            throw new IllegalArgumentException("Invalid connection.");
         }
     }
 
@@ -373,22 +385,26 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
     public void close() {
 
 
-
         try {
 
-            if(mmSocket != null){
+            if (mmSocket != null) {
                 mmSocket.close();
                 mmSocket = null;
             }
 
-            if(mmOutStream != null){
+            if (mmOutStream != null) {
                 mmOutStream.close();
                 mmOutStream = null;
             }
 
-            if(mmInStream != null){
+            if (mmInStream != null) {
                 mmInStream.close();
                 mmInStream = null;
+            }
+
+            if (mReceiver != null) {
+                this.mReceiver.interrupt();
+                mReceiver = null;
             }
 
             this.notifyMediaStateChange(MediaState.CLOSING);
@@ -409,8 +425,8 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
     private void notifyMediaStateChange(MediaState state) {
         IGXMediaListener listener;
-        for(Iterator var2 = this.mMediaListeners.iterator(); var2.hasNext(); listener.onMediaStateChange(this, new MediaStateEventArgs(state))) {
-            listener = (IGXMediaListener)var2.next();
+        for (Iterator var2 = this.mMediaListeners.iterator(); var2.hasNext(); listener.onMediaStateChange(this, new MediaStateEventArgs(state))) {
+            listener = (IGXMediaListener) var2.next();
             if (this.mTrace.ordinal() >= TraceLevel.ERROR.ordinal()) {
                 listener.onTrace(this, new TraceEventArgs(TraceTypes.INFO, state));
             }
@@ -424,8 +440,8 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                 public void run() {
                     Iterator var1 = GXBlutooth.this.mMediaListeners.iterator();
 
-                    while(var1.hasNext()) {
-                        IGXMediaListener listener = (IGXMediaListener)var1.next();
+                    while (var1.hasNext()) {
+                        IGXMediaListener listener = (IGXMediaListener) var1.next();
                         listener.onError(this, ex);
                         if (GXBlutooth.this.mTrace.ordinal() >= TraceLevel.ERROR.ordinal()) {
                             listener.onTrace(this, new TraceEventArgs(TraceTypes.ERROR, ex));
@@ -437,12 +453,36 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         } else {
             Iterator var2 = this.mMediaListeners.iterator();
 
-            while(var2.hasNext()) {
-                IGXMediaListener listener = (IGXMediaListener)var2.next();
+            while (var2.hasNext()) {
+                IGXMediaListener listener = (IGXMediaListener) var2.next();
                 listener.onError(this, ex);
                 if (this.mTrace.ordinal() >= TraceLevel.ERROR.ordinal()) {
                     listener.onTrace(this, new TraceEventArgs(TraceTypes.ERROR, ex));
                 }
+            }
+        }
+
+    }
+
+    final void notifyReceived(final ReceiveEventArgs arg) {
+        if (this.mActivity != null) {
+            this.mActivity.runOnUiThread(new Runnable() {
+                public void run() {
+                    Iterator var1 = GXBlutooth.this.mMediaListeners.iterator();
+
+                    while (var1.hasNext()) {
+                        IGXMediaListener listener = (IGXMediaListener) var1.next();
+                        listener.onReceived(this, arg);
+                    }
+
+                }
+            });
+        } else {
+            Iterator var2 = this.mMediaListeners.iterator();
+
+            while (var2.hasNext()) {
+                IGXMediaListener listener = (IGXMediaListener) var2.next();
+                listener.onReceived(this, arg);
             }
         }
 
@@ -470,39 +510,20 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                 throw new IllegalArgumentException("Data send failed. Invalid data.");
             } else {
 
-                mmOutStream.write(buff);
+
+                int pos = 0;
 
 
-                this.mBytesSend += (long)buff.length;
-
-
-
-              /*  Handler handler = new Handler();
-                handler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        String TAG = GXBlutooth.class.getSimpleName();*/
-                // Keep listening to the InputStream until an exception occurs.
-
-                byte[] mmBuffer; // mmBuffer store for the stream
-                mmBuffer = new byte[1024];
-                int numBytes; // bytes returned from read()
-
-
-                while (true) {
-                    try {
-                        // Read from the InputStream.
-                        numBytes = mmInStream.read(mmBuffer);
-
-                        // Send the obtained bytes to the UI activity.
-                    } catch (IOException e) {
-                        Log.d(TAG, "Input stream was disconnected", e);
-                        break;
+                for (int dataSize = this.mmSocket.getMaxTransmitPacketSize(); pos <= buff.length; pos += dataSize) {
+                    if (buff.length - pos < dataSize) {
+                        dataSize = buff.length - pos;
                     }
-                }
-                   /* }
-                }, 50);*/
 
+                    this.mmSocket.getOutputStream().write(buff, pos, dataSize);
+
+                }
+
+                this.mBytesSend += (long) buff.length;
 
 
             }
@@ -521,8 +542,8 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                 public void run() {
                     Iterator var1 = GXBlutooth.this.mMediaListeners.iterator();
 
-                    while(var1.hasNext()) {
-                        IGXMediaListener listener = (IGXMediaListener)var1.next();
+                    while (var1.hasNext()) {
+                        IGXMediaListener listener = (IGXMediaListener) var1.next();
                         listener.onTrace(this, arg);
                     }
 
@@ -531,13 +552,14 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         } else {
             Iterator var2 = this.mMediaListeners.iterator();
 
-            while(var2.hasNext()) {
-                IGXMediaListener listener = (IGXMediaListener)var2.next();
+            while (var2.hasNext()) {
+                IGXMediaListener listener = (IGXMediaListener) var2.next();
                 listener.onTrace(this, arg);
             }
         }
 
     }
+
     @Override
     public String getMediaType() {
         return "Serial";
@@ -597,14 +619,14 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                 XmlPullParser parser = Xml.newPullParser();
                 parser.setInput(new StringReader(value));
 
-                while(true) {
-                    while(true) {
+                while (true) {
+                    while (true) {
                         int event;
                         do {
                             if ((event = parser.next()) == 3 || event == 1) {
                                 return;
                             }
-                        } while(event != 2);
+                        } while (event != 2);
 
                         String target = parser.getName();
                         boolean found = false;
@@ -613,7 +635,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                             GXPort[] var7 = this.getPorts();
                             int var8 = var7.length;
 
-                            for(int var9 = 0; var9 < var8; ++var9) {
+                            for (int var9 = 0; var9 < var8; ++var9) {
                                 GXPort it = var7[var9];
                                 if (name.equalsIgnoreCase(it.getPort())) {
                                     this.setPort(it);
@@ -623,7 +645,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                             }
 
                             if (!found) {
-                                this.setPort((GXPort)null);
+                                this.setPort((GXPort) null);
                             }
                         } else if ("BaudRate".equalsIgnoreCase(target)) {
                             this.setBaudRate(BaudRate.forValue(Integer.parseInt(readText(parser))));
@@ -654,7 +676,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
     @Override
     public Object getSynchronous() {
-        synchronized(this) {
+        synchronized (this) {
             int[] tmp = new int[]{this.mSynchronous};
             GXSync obj = new GXSync(tmp);
             this.mSynchronous = tmp[0];
@@ -664,7 +686,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
     @Override
     public boolean getIsSynchronous() {
-        synchronized(this) {
+        synchronized (this) {
             return this.mSynchronous != 0;
         }
     }
@@ -676,7 +698,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
     @Override
     public void resetSynchronousBuffer() {
-        synchronized(this.mSyncBase.getSync()) {
+        synchronized (this.mSyncBase.getSync()) {
             this.mSyncBase.resetReceivedSize();
         }
     }
@@ -693,13 +715,13 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
     @Override
     public long getBytesReceived() {
-        throw new UnsupportedOperationException();
+        return this.mReceiver.getBytesReceived();
     }
 
     @Override
     public void resetByteCounters() {
         this.mBytesSend = 0L;
-        throw new UnsupportedOperationException();
+        this.mReceiver.resetBytesReceived();
     }
 
     @Override
@@ -766,8 +788,8 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
                 public void run() {
                     Iterator var1 = GXBlutooth.this.mMediaListeners.iterator();
 
-                    while(var1.hasNext()) {
-                        IGXMediaListener listener = (IGXMediaListener)var1.next();
+                    while (var1.hasNext()) {
+                        IGXMediaListener listener = (IGXMediaListener) var1.next();
                         listener.onPropertyChanged(this, new PropertyChangedEventArgs(info));
                     }
 
@@ -776,8 +798,8 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         } else {
             Iterator var2 = this.mMediaListeners.iterator();
 
-            while(var2.hasNext()) {
-                IGXMediaListener listener = (IGXMediaListener)var2.next();
+            while (var2.hasNext()) {
+                IGXMediaListener listener = (IGXMediaListener) var2.next();
                 listener.onPropertyChanged(this, new PropertyChangedEventArgs(info));
             }
         }
@@ -865,7 +887,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
     public GXPort[] getPorts() {
         Class var1 = GXPort.class;
-        synchronized(GXPort.class) {
+        synchronized (GXPort.class) {
             if (mPorts == null) {
                 //String name = "gurux.serial";
                 //IntentFilter filter2 = new IntentFilter(name);
@@ -895,7 +917,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
 
                 Class var29 = GXPort.class;
-                synchronized(GXPort.class) {
+                synchronized (GXPort.class) {
                     mPorts.add(port);
                 }
 
@@ -903,18 +925,17 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
             }
         }
 
-        return (GXPort[])mPorts.toArray(new GXPort[mPorts.size()]);
+        return (GXPort[]) mPorts.toArray(new GXPort[mPorts.size()]);
     }
 
 
-
-
     class ConnectThread extends Thread {
-        private  final String TAG = ConnectThread.class.getSimpleName();
-        private  final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+        private final String TAG = ConnectThread.class.getSimpleName();
+        private final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
         private final BluetoothSocket mmSocket;
         private final BluetoothDevice mmDevice;
         private BluetoothAdapter mBluetoothAdapter;
+
         public ConnectThread(BluetoothDevice device) {
             // Use a temporary object that is later assigned to mmSocket
             // because mmSocket is final.
@@ -935,7 +956,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
 
         public void run() {
             // Cancel discovery because it otherwise slows down the connection.
-            if(mBluetoothAdapter.isDiscovering()) {
+            if (mBluetoothAdapter.isDiscovering()) {
                 mBluetoothAdapter.cancelDiscovery();
             }
 
@@ -990,7 +1011,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
     }
 
     class ConnectedThread extends Thread {
-        private  final String TAG = ConnectedThread.class.getSimpleName();
+        private final String TAG = ConnectedThread.class.getSimpleName();
         //private final BluetoothSocket mmSocket;
         //private final InputStream mmInStream;
         //private final OutputStream mmOutStream;
@@ -1079,6 +1100,7 @@ public class GXBlutooth  implements IGXMedia2, AutoCloseable {
         os.writeObject(obj);
         return out.toByteArray();
     }
+
     public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         ObjectInputStream is = new ObjectInputStream(in);

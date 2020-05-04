@@ -34,9 +34,12 @@
 
 package gurux.dlms.android;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.widget.Toast;
 
 import gurux.dlms.GXDLMSConverter;
@@ -46,6 +49,7 @@ import gurux.dlms.manufacturersettings.GXManufacturerCollection;
  * Show splashscreen and load necessary content.
  */
 public class GXSplashScreen extends Activity implements IGXTaskCallback {
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +64,10 @@ public class GXSplashScreen extends Activity implements IGXTaskCallback {
 
     @Override
     public void onExecute(final GXTask sender) {
-        //Read OBIS codes.
+
+//check for permission
+
+       /* //Read OBIS codes.
         if (GXDLMSConverter.isFirstRun(this)) {
             GXDLMSConverter c = new GXDLMSConverter();
             c.update(this);
@@ -69,7 +76,7 @@ public class GXSplashScreen extends Activity implements IGXTaskCallback {
         if (GXManufacturerCollection.isFirstRun(this) ||
                 GXManufacturerCollection.isUpdatesAvailable(this)) {
             GXManufacturerCollection.updateManufactureSettings(this);
-        }
+        }*/
     }
 
     /**

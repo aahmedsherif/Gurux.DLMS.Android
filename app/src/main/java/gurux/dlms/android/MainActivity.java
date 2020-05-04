@@ -34,14 +34,17 @@
 
 package gurux.dlms.android;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
+import android.support.v4.content.ContextCompat;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -65,10 +68,19 @@ public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
     GXDevice mDevice = new GXDevice();
     private GXManufacturerCollection mManufacturers = new GXManufacturerCollection();
+    public static  final int READ_EXTERNAL_STORAGE_PERMISSION_CODE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if(ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED){
+            //ask for permission
+            requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, READ_EXTERNAL_STORAGE_PERMISSION_CODE);
+        }
+
+
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -106,13 +118,16 @@ public class MainActivity extends AppCompatActivity
             }
         }
         if (fragment == null){
-            fragment = GXMain.newInstance(mDevice);
+            fragment = GXMain.newInstance(mDevice, mManufacturers);
         }
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         ft.replace(R.id.mainFrame, fragment);
         ft.commit();
         GXManufacturerCollection.readManufacturerSettings(this, mManufacturers);
         String name = mDevice.getManufacturer();
+
+
+
     }
 
     private void loadSettings() {
@@ -224,7 +239,7 @@ public class MainActivity extends AppCompatActivity
         int id = item.getItemId();
         Intent i;
         if (id == R.id.nav_read) {
-            fragment = GXMain.newInstance(mDevice);
+            fragment = GXMain.newInstance(mDevice, mManufacturers);
         } else if (id == R.id.nav_obis_translator) {
             fragment = new GXObisTranslator();
         } else if (id == R.id.nav_xml_translator) {

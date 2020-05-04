@@ -77,6 +77,10 @@ import gurux.dlms.enums.ErrorCode;
 import gurux.dlms.enums.InterfaceType;
 import gurux.dlms.enums.ObjectType;
 import gurux.dlms.enums.RequestTypes;
+import gurux.dlms.manufacturersettings.GXAuthentication;
+import gurux.dlms.manufacturersettings.GXManufacturer;
+import gurux.dlms.manufacturersettings.GXManufacturerCollection;
+import gurux.dlms.manufacturersettings.GXServerAddress;
 import gurux.dlms.manufacturersettings.StartProtocolType;
 import gurux.dlms.objects.GXDLMSDemandRegister;
 import gurux.dlms.objects.GXDLMSObject;
@@ -106,14 +110,17 @@ public class GXMain extends Fragment implements IGXMediaListener, IGXTaskCallbac
     CheckBox mShowTrace;
     EditText mTrace;
 
+    GXManufacturerCollection mManufacturers;
+
     public GXMain() {
         // Required empty public constructor
     }
 
-    public static GXMain newInstance(GXDevice device) {
+    public static GXMain newInstance(GXDevice device, GXManufacturerCollection manufacturers) {
         GXMain fragment = new GXMain();
         Bundle args = new Bundle();
         args.putParcelable("device", device);
+        args.putParcelable("manufacturers", manufacturers);
         fragment.setArguments(args);
         return fragment;
     }
@@ -123,6 +130,7 @@ public class GXMain extends Fragment implements IGXMediaListener, IGXTaskCallbac
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             mDevice = (GXDevice) getArguments().getParcelable("device");
+            mManufacturers = (GXManufacturerCollection) getArguments().getParcelable("manufacturers");
         }
     }
 
@@ -641,11 +649,13 @@ public class GXMain extends Fragment implements IGXMediaListener, IGXTaskCallbac
                     throw new Exception("Invalid responce.");
                 }
                 String manufactureID = replyStr.substring(1, 4);
-                if (mDevice.getManufacturer().compareToIgnoreCase(manufactureID) != 0) {
+                /*if (mDevice.getManufacturer().compareToIgnoreCase(manufactureID) != 0) {
                     throw new Exception("Manufacturer "
                             + mDevice.getManufacturer()
                             + " expected but " + manufactureID + " found.");
-                }
+                }*/
+                updateManufacturere(mDevice, manufactureID);
+
                 int bitrate = 0;
                 char baudrate = replyStr.charAt(4);
                 switch (baudrate) {
@@ -728,6 +738,37 @@ public class GXMain extends Fragment implements IGXMediaListener, IGXTaskCallbac
                 readDLMSPacket(it, reply);
             }
             mClient.parseApplicationAssociationResponse(reply.getData());
+        }
+    }
+
+    private void updateManufacturere(GXDevice mDevice, String manufactureID){
+
+        for (GXManufacturer it : mManufacturers) {
+            if(it.getIdentification().equals(manufactureID) ){
+                mDevice.setManufacturer(it.getIdentification());
+
+                GXServerAddress selectedServerAddress = it.getServerSettings().get(0);
+                for(GXServerAddress serverAddress : it.getServerSettings()){
+                    if(serverAddress.getSelected()){
+                        selectedServerAddress = serverAddress;
+                    }
+                }
+
+                GXAuthentication selectedAuthentication = it.getSettings().get(0);
+                for(GXAuthentication authentication : it.getSettings()){
+                    if(authentication.getSelected()){
+                        selectedAuthentication = authentication;
+                    }
+                }
+
+                mDevice.setLogicalNameReferencing(it.getUseLogicalNameReferencing());
+                mDevice.setAuthentication(selectedAuthentication.getType());
+                mDevice.setClientAddress(selectedAuthentication.getClientAddress());
+                mDevice.setPassword(selectedAuthentication.getPassword().toString());
+                mDevice.setPhysicalAddress(selectedServerAddress.getPhysicalAddress());
+                mDevice.setLogicalAddress(selectedServerAddress.getLogicalAddress());
+                mDevice.setStartProtocol(it.getStartProtocol());
+            }
         }
     }
 

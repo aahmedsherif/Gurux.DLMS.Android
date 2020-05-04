@@ -1,10 +1,12 @@
 package gurux.dlms;
 
 import android.content.Context;
+import android.os.Environment;
 import android.util.Log;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -307,7 +309,10 @@ public class GXDLMSConverter {
      */
     private static void
     readStandardObisInfo(final Context context, final GXStandardObisCodeCollection codes) {
-        try (java.io.FileInputStream stream = context.openFileInput("obiscodes.txt")) {
+
+        File file = new File(Environment.getExternalStorageDirectory(), "sceco/Gurux/obiscodes.txt");
+
+        try (java.io.FileInputStream stream = new FileInputStream(file)) {
             if (stream == null) {
                 return;
             }

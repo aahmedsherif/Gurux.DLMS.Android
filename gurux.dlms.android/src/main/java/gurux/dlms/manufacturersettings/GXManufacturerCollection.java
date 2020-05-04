@@ -49,6 +49,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -230,14 +231,18 @@ public class GXManufacturerCollection
             final Context context,
             final GXManufacturerCollection manufacturers) {
         manufacturers.clear();
-        File dir = context.getFilesDir();
+
+        File dir = new File(Environment.getExternalStorageDirectory(), "sceco/Gurux");
+
         String[] files = dir.list();
         // Either directory does not exist or is not a directory
         if (files != null) {
             for (String it : files) {
                 if (it.endsWith(".obx")) {
                     try {
-                        try (java.io.FileInputStream in = context.openFileInput(it)) {
+                        File file = new File(dir.getAbsolutePath(),  it );
+
+                        try (java.io.FileInputStream in = new FileInputStream(file)) {
                             manufacturers.add(parse(in));
                         }
                     } catch (Exception e) {
@@ -319,6 +324,17 @@ public class GXManufacturerCollection
                 } else if (target.equalsIgnoreCase("Selected")) {
                     // Old functionality.
                     continue;
+                }else if (target.equalsIgnoreCase("SelectedAuthentication")) {
+
+                    if (authentication != null) {
+                        authentication.setSelected(Boolean.parseBoolean((readText(parser))));
+                    }
+                }else if (target.equalsIgnoreCase("SelectedAddress")) {
+
+                    if (serveraddress != null) {
+                        serveraddress.setSelected(Boolean.parseBoolean((readText(parser))));
+                    }
+
                 } else if (target.equalsIgnoreCase("InactivityMode")) {
                     man.setInactivityMode(
                             gurux.dlms.manufacturersettings.InactivityMode

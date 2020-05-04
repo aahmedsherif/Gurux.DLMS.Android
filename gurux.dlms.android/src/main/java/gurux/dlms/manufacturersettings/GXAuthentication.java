@@ -46,6 +46,7 @@ public class GXAuthentication {
     private int clientAddress;
     private Authentication type = Authentication.NONE;
     private byte[] password;
+    private boolean selected;
 
     public GXAuthentication() {
     }
@@ -149,5 +150,13 @@ public class GXAuthentication {
      */
     public final void setPassword(final byte[] value) {
         password = value;
+    }
+
+    public boolean getSelected() {
+        return selected;
+    }
+
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 }

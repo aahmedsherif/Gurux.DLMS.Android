@@ -86,10 +86,17 @@ public class GXBlutoothReceiveThread  extends Thread {
     }
 
     public final void run() {
+
+
         byte[] buff = new byte[this.mConnection.getMaxReceivePacketSize()];
 
         while(!Thread.currentThread().isInterrupted()) {
             try {
+
+                if(!this.mConnection.isConnected()){
+                    break;
+                }
+
                 if(this.mConnection.getInputStream().available() > 0) {
 
 

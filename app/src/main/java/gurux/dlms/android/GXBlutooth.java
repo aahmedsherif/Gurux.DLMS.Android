@@ -52,6 +52,7 @@ import gurux.io.StopBits;
 import gurux.serial.GXPort;
 import gurux.serial.GXProperties;
 import gurux.serial.GXPropertiesFragment;
+import gurux.serial.GXSerial;
 import gurux.serial.IGXSerialListener;
 import gurux.serial.enums.AvailableMediaSettings;
 
@@ -513,8 +514,13 @@ public class GXBlutooth implements IGXMedia2, AutoCloseable {
 
                 int pos = 0;
 
+                int dataSize = buff.length;
+                if(this.mmSocket.getMaxTransmitPacketSize() > 0){
+                    dataSize = this.mmSocket.getMaxTransmitPacketSize();
+                }
 
-                for (int dataSize = this.mmSocket.getMaxTransmitPacketSize(); pos <= buff.length; pos += dataSize) {
+
+                for ( ; pos < buff.length; pos += dataSize) {
                     if (buff.length - pos < dataSize) {
                         dataSize = buff.length - pos;
                     }
